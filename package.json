@@ -1,0 +1,25 @@
+{
+
+  "name": "test",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha test/login.js --timeout 60000",
+    "report-mochawesome": "mocha test/login.js --timeout 60000 --reporter mochawesome --reporter-options reportDir=mochawesome-report,reportFilename=report,overwrite=true,html=true,json=true",
+    "report-simple-html": "mocha test/login.js --timeout 60000 --reporter mocha-simple-html-reporter --reporter-options output=report/report.html"
+
+  },
+
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "selenium-webdriver": "^4.46.0"
+  },
+  "devDependencies": {
+    "mocha": "^11.7.6",
+    "mocha-simple-html-reporter": "^2.0.0",
+    "mochawesome": "^8.0.1"
+  }
+}
