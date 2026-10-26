@@ -1,182 +1,187 @@
+
 const { Builder, By, until } = require("selenium-webdriver");
-const assert = require("assert");
 const chrome = require("selenium-webdriver/chrome");
+const assert = require("assert");
 
-describe("Automation Belajar Bareng", function () {
-    this.timeout(60000);
+describe("Automation Testing Web Belajar Bareng - Login dan Add User", function () {
+  this.timeout(60000);
 
-    let driver;
+  let driver;
 
-    before(async function () {
-        const options = new chrome.Options();
+  beforeEach(async function () {
+    const options = new chrome.Options();
+    options.addArguments("--disable-notifications");
+    options.addArguments("--disable-save-password-bubble");
 
-        options.addArguments("--disable-features=PasswordLeakDetection");
+    driver = await new Builder()
+      .forBrowser("chrome")
+      .setChromeOptions(options)
+      .build();
+  });
 
-        options.setUserPreferences({
-            credentials_enable_service: false,
-            "profile.password_manager_enabled": false,
-            "profile.password_manager_leak_detection": false
-        });
+  afterEach(async function () {
+    if (driver) {
+      await driver.quit();
+      driver = null;
+    }
+  });
 
-        driver = await new Builder()
-            .forBrowser("chrome")
-            .setChromeOptions(options)
-            .build();
-    });
+  async function loginAdmin() {
+    await driver.get("https://belajar-bareng.onrender.com/");
 
-    after(async function () {
-        await driver.quit();
-    });
+    await driver
+      .findElement(By.css('[data-testid="username-input"]'))
+      .sendKeys("admin");
 
-    // Login Positive
-    it("Login berhasil", async function () {
-        await driver.get("https://belajar-bareng.onrender.com/");
+    await driver
+      .findElement(By.css('[data-testid="password-input"]'))
+      .sendKeys("admin");
 
-        await driver.findElement(
-            By.css('[data-testid="username-input"]')
-        ).sendKeys("admin");
+    await driver
+      .findElement(By.css('[data-testid="login-button"]'))
+      .click();
 
-        await driver.findElement(
-            By.css('[data-testid="password-input"]')
-        ).sendKeys("admin");
+    await driver.wait(until.urlContains("/users"), 10000);
+  }
 
-        await driver.findElement(
-            By.css('[data-testid="login-button"]')
-        ).click();
+  // Membuat username unik (maksimal 10 karakter)
+  function createUniqueUsername() {
+    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let number = Date.now();
+    let suffix = "";
 
-        await driver.wait(
-            until.urlContains("/users"),
-            10000
-        );
+    while (number > 0) {
+      suffix = letters[number % 26] + suffix;
+      number = Math.floor(number / 26);
+    }
 
-        assert.ok(
-            (await driver.getCurrentUrl()).includes("/users"),
-            "Login gagal"
-        );
-    });
+    return ("Q" + suffix).slice(0, 10);
+  }
 
-    // Login Negative
-    it("Login dengan password salah", async function () {
-        await driver.get("https://belajar-bareng.onrender.com/");
+  // Login berhasil
+  it("Login berhasil", async function () {
+    await loginAdmin();
 
-        await driver.findElement(
-            By.css('[data-testid="username-input"]')
-        ).sendKeys("admin");
+    const currentUrl = await driver.getCurrentUrl();
 
-        await driver.findElement(
-            By.css('[data-testid="password-input"]')
-        ).sendKeys("salah123");
+    assert.ok(
+      currentUrl.includes("/users"),
+      "Login gagal, halaman Users tidak terbuka"
+    );
+  });
 
-        await driver.findElement(
-            By.css('[data-testid="login-button"]')
-        ).click();
+  // Login dengan password salah
+  it("Login dengan password salah", async function () {
+    await driver.get("https://belajar-bareng.onrender.com/");
 
-        await driver.sleep(500);
+    await driver
+      .findElement(By.css('[data-testid="username-input"]'))
+      .sendKeys("admin");
 
-        assert.ok(
-            !(await driver.getCurrentUrl()).includes("/users"),
-            "Login tetap berhasil"
-        );
-    });
+    await driver
+      .findElement(By.css('[data-testid="password-input"]'))
+      .sendKeys("salah123");
 
-    // Add User Positive
-    it("Add User berhasil", async function () {
-        await driver.get("https://belajar-bareng.onrender.com/");
+    await driver
+      .findElement(By.css('[data-testid="login-button"]'))
+      .click();
 
-        await driver.findElement(
-            By.css('[data-testid="username-input"]')
-        ).sendKeys("admin");
+    await driver.sleep(1500);
 
-        await driver.findElement(
-            By.css('[data-testid="password-input"]')
-        ).sendKeys("admin");
+    const currentUrl = await driver.getCurrentUrl();
 
-        await driver.findElement(
-            By.css('[data-testid="login-button"]')
-        ).click();
+    assert.ok(
+      !currentUrl.includes("/users"),
+      "Login seharusnya gagal menggunakan password yang salah"
+    );
+  });
 
-        await driver.wait(
-            until.urlContains("/users"),
-            10000
-        );
+  // Add User berhasil
+  it("Add User berhasil", async function () {
+    await loginAdmin();
 
-        await driver.findElement(
-            By.xpath("//*[normalize-space()='Add']")
-        ).click();
+    await driver
+      .findElement(By.xpath("//*[normalize-space()='Add']"))
+      .click();
 
-        const username = await driver.findElement(
-            By.css('[data-testid="username-input"]')
-        );
+    const newUsername = createUniqueUsername();
 
-        const age = await driver.findElement(
-            By.css('[data-testid="age-input"]')
-        );
+    const usernameInput = await driver.findElement(
+      By.css('[data-testid="username-input"]')
+    );
 
-        await username.sendKeys(
-            "NRTest" + Date.now().toString().slice(-3)
-        );
+    await usernameInput.clear();
+    await usernameInput.sendKeys(newUsername);
 
-        await age.sendKeys("27");
+    const actualUsername = await usernameInput.getAttribute("value");
 
-        assert.ok(
-            (await username.getAttribute("value")).length > 0,
-            "Username kosong"
-        );
+    assert.strictEqual(
+      actualUsername,
+      newUsername,
+      `Username berubah. Diharapkan "${newUsername}", tetapi kolom berisi "${actualUsername}"`
+    );
 
-        assert.strictEqual(
-            await age.getAttribute("value"),
-            "27",
-            "Age kosong"
-        );
+    await driver
+      .findElement(By.css('[data-testid="age-input"]'))
+      .sendKeys("27");
 
-        await driver.findElement(
-            By.css('[data-testid="submit-button"]')
-        ).click();
-    });
+    await driver
+      .findElement(By.css('[data-testid="submit-button"]'))
+      .click();
 
-    // Add User Negative
-    it("Add User dengan username kosong", async function () {
-        await driver.get("https://belajar-bareng.onrender.com/");
+    await driver.wait(async function () {
+      const bodyText = await driver
+        .findElement(By.css("body"))
+        .getText();
 
-        await driver.findElement(
-            By.css('[data-testid="username-input"]')
-        ).sendKeys("admin");
+      return (
+        bodyText.includes("User successfully added") ||
+        bodyText.includes("already exists") ||
+        bodyText.includes("Missing username") ||
+        bodyText.toLowerCase().includes("error")
+      );
+    }, 10000);
 
-        await driver.findElement(
-            By.css('[data-testid="password-input"]')
-        ).sendKeys("admin");
+    const bodyText = await driver
+      .findElement(By.css("body"))
+      .getText();
 
-        await driver.findElement(
-            By.css('[data-testid="login-button"]')
-        ).click();
+    assert.ok(
+      bodyText.includes("User successfully added"),
+      `Add User gagal untuk username "${newUsername}". Pesan website: ${bodyText}`
+    );
+  });
 
-        await driver.wait(
-            until.urlContains("/users"),
-            10000
-        );
+  // Add User dengan Age kosong
+  it("Add User dengan Age kosong", async function () {
+    await loginAdmin();
 
-        await driver.findElement(
-            By.xpath("//*[normalize-space()='Add']")
-        ).click();
+    await driver
+      .findElement(By.xpath("//*[normalize-space()='Add']"))
+      .click();
 
-        const username = await driver.findElement(
-            By.css('[data-testid="username-input"]')
-        );
+    const usernameInput = await driver.findElement(
+      By.css('[data-testid="username-input"]')
+    );
 
-        const age = await driver.findElement(
-            By.css('[data-testid="age-input"]')
-        );
+    const ageInput = await driver.findElement(
+      By.css('[data-testid="age-input"]')
+    );
 
-        await age.sendKeys("25");
+    await usernameInput.sendKeys("Umira");
 
-        await driver.findElement(
-            By.css('[data-testid="submit-button"]')
-        ).click();
+    await driver
+      .findElement(By.css('[data-testid="submit-button"]'))
+      .click();
 
-        assert.strictEqual(
-            await username.getAttribute("validationMessage"),
-            "Please fill out this field.",
-            "Validasi username tidak muncul"
-        );
-    });
+    const validationMessage = await ageInput.getAttribute(
+      "validationMessage"
+    );
+
+    assert.strictEqual(
+      validationMessage,
+      "Please fill out this field.",
+      "Validasi Age kosong tidak sesuai"
+    );
+  });
 });
